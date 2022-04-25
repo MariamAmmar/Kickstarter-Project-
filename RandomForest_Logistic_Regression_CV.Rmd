@@ -1,0 +1,152 @@
+---
+title: "Kickstarter_RandomForest and Logistic Regression with CV"
+output: html_document
+---
+
+```{r }
+#Import Packages
+library(caret)
+library(dplyr)
+library(caret)
+library(randomForest)
+library(caret)
+library(mltools)
+library(data.table)
+
+data = read.csv("/Users/mariamammar/Downloads/Kickstarter_Clean.csv")
+
+data$staff_pick = ifelse(data$staff_pick == "True",1,0)
+
+data$state <- ifelse(data$state == "failed",1,0)
+
+data$launch_hour <- as.factor(data$launch_hour)
+data$launch_month = as.factor(data$launch_month)
+
+
+data =  data[,c('state','ctgy_parent_name','lc_name','lc_expanded_country','daysToLaunch',
+         'campaignDuration','launch_day','launch_hour','launch_month',
+         'goal_converted','price','staff_pick')]
+
+data_nodummy = data[,c('state','daysToLaunch',
+         'campaignDuration','goal_converted','price','staff_pick')]
+
+dummy <- dummyVars(" ~ ctgy_parent_name + lc_name + lc_expanded_country + launch_day +
+                   launch_hour + launch_month", data=data)
+
+
+
+new_data <- data.frame(predict(dummy, newdata = data))
+
+new_data$state = as.factor(data$state)
+new_data$price = data$price
+new_data$daysToLaunch = data$daysToLaunch
+new_data$campaignDuration = data$campaignDuration
+new_data$goal_converted = data$goal_converted
+new_data$staff_pick = as.factor(data$staff_pick)
+
+
+
+```
+
+
+
+```{r}
+
+
+dt = sort(sample(nrow(new_data), nrow(new_data)*.8))
+train<-data[dt,]
+test<-data[-dt,]
+
+train$state <- as.character(train$state)
+train$state <- as.factor(train$state)
+
+```
+
+
+```{r}
+rf <- randomForest(state ~ ., data = train, importance = TRUE,
+                        proximity = TRUE)
+
+print(rf)
+
+```
+
+
+```{r}
+library(caret)
+
+
+test$state <- as.character(test$state)
+test$state <- as.factor(test$state)
+
+pred = predict(rf, test[-1])
+
+confusionMatrix(pred, test$state, mode = "everything", positive="0")
+
+
+
+
+
+```
+
+
+```{r}
+set.seed(500)
+
+logistic_model_CV = train(form = state ~ ctgy_parent_name + lc_name +
+                         lc_expanded_country + daysToLaunch + 
+                         campaignDuration + launch_day + 
+                         launch_month + launch_hour +
+                         goal_converted + price + staff_pick, 
+                      
+    data = train,
+    trControl = trainControl(method = "cv", number = 10),
+    method = "glm",
+   family = "binomial"
+  )
+
+summary(logistic_model_CV)
+```
+
+
+
+```{r}
+
+library(pscl)
+
+pred <- predict(logistic_model_CV, newdata=test[-1])
+  # look for 'McFadden'
+
+confusionMatrix(data=pred, test$state)
+
+```
+
+
+```{r}
+confusionMatrix(glm_pred, test$state, mode = "everything", positive="1")
+
+```
+
+
+
+```{r}
+```
+
+
+```{r}
+i_scores <- varImp(rf, conditional=TRUE)
+i_scores <- i_scores %>% tibble::rownames_to_column("var") 
+
+
+i_scores
+
+```
+```
+
+
+```{r}
+```
+
+
+
+
